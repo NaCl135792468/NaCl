@@ -3,86 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>背單字系統</title>
+    <title>任務日程規劃器</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <!-- 標題 -->
-        <header>
-            <h1>📚 背單字系統</h1>
-            <div class="header-buttons">
-                <button class="btn-toggle" id="toggleManager">管理單字</button>
+    <div class="app-shell">
+        <header class="app-header">
+            <div>
+                <p class="app-subtitle">日程規劃 / 任務欄</p>
+                <h1>冒險日誌</h1>
             </div>
+            <div class="header-badge">管理者模式</div>
         </header>
 
-        <!-- 卡片學習區域 -->
-        <main id="learningArea" class="learning-section">
-            <div class="controls">
-                <span class="card-counter"><span id="currentCard">1</span> / <span id="totalCards">10</span></span>
-                <div class="button-group">
-                    <button class="btn" id="prevBtn">← 上一張</button>
-                    <button class="btn" id="nextBtn">下一張 →</button>
+        <main class="layout">
+            <section class="panel quest-panel">
+                <div class="panel-header">
+                    <div>
+                        <p class="panel-label">任務欄</p>
+                        <h2>今日待辦任務</h2>
+                    </div>
+                    <div class="summary-badge">
+                        <span id="taskCount">0</span> 個任務
+                    </div>
                 </div>
-            </div>
+                <div id="taskList" class="task-list"></div>
+            </section>
 
-            <div class="cards-container">
-                <div id="cardsList"></div>
-            </div>
+            <aside class="panel form-panel">
+                <div class="panel-header">
+                    <div>
+                        <p class="panel-label">右側新增區</p>
+                        <h2>新增任務</h2>
+                    </div>
+                </div>
 
-            <div class="progress-bar">
-                <div id="progressFill"></div>
-            </div>
+                <form id="taskForm" class="task-form">
+                    <div class="field-group">
+                        <label for="taskTitle">任務標題</label>
+                        <input
+                            type="text"
+                            id="taskTitle"
+                            placeholder="例如：完成專案報告"
+                            required
+                        >
+                    </div>
+                    <div class="field-group">
+                        <label for="taskTime">預定時間</label>
+                        <input
+                            type="datetime-local"
+                            id="taskTime"
+                            required
+                        >
+                    </div>
+                    <div class="field-group">
+                        <label for="taskNotes">備註 / 任務說明</label>
+                        <textarea
+                            id="taskNotes"
+                            rows="4"
+                            placeholder="例如：上午10點與團隊會議"
+                        ></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        新增任務
+                    </button>
+                </form>
+
+                <div class="hint-card">
+                    <p>
+                        新增後任務會立即出現在左側任務欄中。
+                        可標記完成或刪除任務。
+                    </p>
+                </div>
+            </aside>
         </main>
-
-        <!-- 管理介面 -->
-        <section id="managerArea" class="manager-section hidden">
-            <div class="manager-header">
-                <h2>新增單字</h2>
-                <button class="btn-close" id="closeManager">✕</button>
-            </div>
-
-            <form id="addWordForm" class="form-container">
-                <div class="form-group">
-                    <label for="english">英文單字 *</label>
-                    <input type="text" id="english" required placeholder="例如：book">
-                </div>
-
-                <div class="form-group">
-                    <label for="chinese">中文解釋 *</label>
-                    <input type="text" id="chinese" required placeholder="例如：書籍">
-                </div>
-
-                <div class="form-group">
-                    <label for="partOfSpeech">詞性 *</label>
-                    <select id="partOfSpeech" required>
-                        <option value="">選擇詞性</option>
-                        <option value="名詞">名詞</option>
-                        <option value="動詞">動詞</option>
-                        <option value="形容詞">形容詞</option>
-                        <option value="副詞">副詞</option>
-                        <option value="代名詞">代名詞</option>
-                        <option value="介詞">介詞</option>
-                        <option value="連詞">連詞</option>
-                        <option value="感嘆詞">感嘆詞</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="example">例句</label>
-                    <textarea id="example" placeholder="例如：I read a book every day."></textarea>
-                </div>
-
-                <button type="submit" class="btn btn-primary">新增單字</button>
-            </form>
-
-            <hr>
-
-            <div class="words-list">
-                <h3>現有單字 (<span id="wordCount">0</span>)</h3>
-                <div id="wordsList" class="words-display"></div>
-            </div>
-        </section>
     </div>
 
     <script src="script.js"></script>
