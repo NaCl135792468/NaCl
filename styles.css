@@ -1,3 +1,4 @@
+
 :root {
     color-scheme: dark;
     --bg: #0c1225;
@@ -62,14 +63,44 @@ body {
     margin-bottom: 8px;
 }
 
-.header-badge {
-    background: linear-gradient(135deg, rgba(142, 197, 252, 0.2), rgba(93, 124, 224, 0.22));
-    color: var(--accent);
-    border: 1px solid rgba(142, 197, 252, 0.18);
-    padding: 10px 18px;
+.header-cta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.import-export {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.dropdown-export {
+    position: relative;
+}
+
+.modal-form input, .modal-form textarea, .modal-form select {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 10px 12px;
+}
+
+.task-tags {
+    display: flex;
+    gap: 6px;
+    margin-left: 8px;
+    align-items: center;
+}
+.tag-badge {
+    display: inline-block;
+    padding: 4px 8px;
     border-radius: 999px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    color: #111;
+    font-size: 12px;
+    font-weight: 600;
 }
 
 .layout {
@@ -114,6 +145,30 @@ body {
     font-weight: 700;
 }
 
+.task-controls {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 18px;
+    margin-bottom: 24px;
+}
+
+.search-wrapper,
+.sort-wrapper {
+    display: grid;
+    gap: 10px;
+}
+
+.search-wrapper input,
+.sort-wrapper select {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    border-radius: 18px;
+    padding: 12px 14px;
+    font-size: 1rem;
+}
+
 .task-list {
     display: grid;
     gap: 18px;
@@ -129,6 +184,18 @@ body {
     border: 1px solid rgba(255,255,255,0.08);
     position: relative;
     overflow: hidden;
+}
+
+.task-card[draggable="true"] {
+    cursor: grab;
+}
+
+.task-card.dragging {
+    opacity: 0.5;
+}
+
+.task-card.drag-over {
+    outline: 2px dashed var(--accent);
 }
 
 .task-card::before {
@@ -150,9 +217,39 @@ body {
     gap: 10px;
 }
 
+.task-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 .task-title {
     font-size: 1.15rem;
     font-weight: 700;
+}
+
+.priority-badge {
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.priority-high {
+    background: rgba(251, 113, 133, 0.18);
+    color: var(--danger);
+}
+
+.priority-normal {
+    background: rgba(96, 165, 250, 0.18);
+    color: var(--accent-soft);
+}
+
+.priority-low {
+    background: rgba(52, 211, 153, 0.18);
+    color: var(--success);
 }
 
 .task-time {
@@ -234,7 +331,8 @@ body {
 }
 
 .field-group input,
-.field-group textarea {
+.field-group textarea,
+.field-group select {
     width: 100%;
     border: 1px solid rgba(255, 255, 255, 0.12);
     background: rgba(255, 255, 255, 0.04);
@@ -246,7 +344,8 @@ body {
 }
 
 .field-group input:focus,
-.field-group textarea:focus {
+.field-group textarea:focus,
+.field-group select:focus {
     outline: none;
     border-color: rgba(142, 197, 252, 0.7);
     background: rgba(255, 255, 255, 0.09);
@@ -265,6 +364,180 @@ body {
     border-radius: 20px;
     color: var(--muted);
     line-height: 1.75;
+}
+
+.calendar-section {
+    margin-top: 24px;
+}
+
+.calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.calendar-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.calendar-cell {
+    min-height: 120px;
+    padding: 14px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.calendar-cell--muted {
+    opacity: 0.5;
+}
+
+.calendar-cell-day {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.calendar-task {
+    background: rgba(96, 165, 250, 0.14);
+    border: 1px solid rgba(96, 165, 250, 0.2);
+    border-radius: 16px;
+    padding: 8px 10px;
+    font-size: 0.88rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.calendar-task + .calendar-task {
+    margin-top: 6px;
+}
+
+.calendar-task[data-priority="high"] {
+    background: rgba(251, 113, 133, 0.16);
+    border-color: rgba(251, 113, 133, 0.25);
+}
+
+.calendar-task[data-priority="low"] {
+    background: rgba(52, 211, 153, 0.14);
+    border-color: rgba(52, 211, 153, 0.22);
+}
+
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(4, 12, 30, 0.8);
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    z-index: 50;
+}
+
+.modal-panel {
+    width: min(520px, 100%);
+    background: rgba(10, 18, 45, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 28px;
+    box-shadow: 0 26px 60px rgba(0, 0, 0, 0.45);
+    padding: 28px;
+    position: relative;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+}
+
+.modal-panel h3 {
+    margin-bottom: 18px;
+}
+
+.modal-form {
+    display: grid;
+    gap: 18px;
+}
+
+.detail-row {
+    margin-bottom: 12px;
+    color: var(--text);
+}
+}
+
+.modal-panel h3 {
+    margin-bottom: 18px;
+}
+
+.detail-row {
+    margin-bottom: 12px;
+    color: var(--text);
+}
+
+.import-preview-table {
+    margin: 20px 0;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.preview-table thead {
+    background: rgba(142, 197, 252, 0.1);
+}
+
+.preview-table th {
+    padding: 12px;
+    text-align: left;
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.preview-table td {
+    padding: 10px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    word-break: break-word;
+}
+
+.preview-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    justify-content: flex-end;
+}
+
+.modal-actions .btn {
+    flex: 1;
 }
 
 @media (max-width: 900px) {
@@ -289,5 +562,9 @@ body {
     .task-actions {
         flex-direction: row;
         justify-content: flex-start;
+    }
+
+    .calendar-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }

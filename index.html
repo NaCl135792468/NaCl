@@ -13,7 +13,18 @@
                 <p class="app-subtitle">日程規劃 / 任務欄</p>
                 <h1>冒險日誌</h1>
             </div>
-            <div class="header-badge">管理者模式</div>
+            <div class="header-cta">
+                <button type="button" class="btn btn-secondary view-toggle active" data-view="list">任務列表</button>
+                <button type="button" class="btn btn-secondary view-toggle" data-view="calendar">日曆視圖</button>
+                <button type="button" class="btn btn-secondary view-toggle" data-view="week">週視圖</button>
+                <div class="import-export">
+                    <input type="file" id="importFile" accept=".json,.csv,.xlsx" style="display:none">
+                    <button type="button" class="btn btn-secondary" id="importBtn">匯入</button>
+                    <div class="dropdown-export">
+                        <button type="button" class="btn btn-secondary" id="exportBtn">匯出</button>
+                    </div>
+                </div>
+            </div>
         </header>
 
         <main class="layout">
@@ -24,10 +35,44 @@
                         <h2>今日待辦任務</h2>
                     </div>
                     <div class="summary-badge">
-                        <span id="taskCount">0</span> 個任務
+                        <span id="taskCount">0</span> / <span id="taskTotal">0</span> 個任務
                     </div>
                 </div>
-                <div id="taskList" class="task-list"></div>
+
+                <div class="task-controls">
+                    <div class="search-wrapper">
+                        <label for="taskSearch">搜尋任務</label>
+                        <input type="search" id="taskSearch" placeholder="輸入標題、時間或備註">
+                    </div>
+                    <div class="filter-wrapper">
+                        <label for="tagFilter">標籤篩選</label>
+                        <select id="tagFilter">
+                            <option value="">全部標籤</option>
+                        </select>
+                    </div>
+                    <div class="sort-wrapper">
+                        <label for="taskSort">排序方式</label>
+                        <select id="taskSort">
+                            <option value="manual">手動排序</option>
+                            <option value="time">依時間</option>
+                            <option value="priority">依優先級</option>
+                            <option value="done">依完成狀態</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="taskListSection" class="task-list-section">
+                    <div id="taskList" class="task-list"></div>
+                </div>
+
+                <div id="calendarSection" class="calendar-section hidden">
+                    <div class="calendar-header">
+                        <button type="button" class="btn btn-secondary" id="prevMonthBtn">◀</button>
+                        <div class="calendar-title" id="currentMonthLabel"></div>
+                        <button type="button" class="btn btn-secondary" id="nextMonthBtn">▶</button>
+                    </div>
+                    <div class="calendar-grid" id="calendarGrid"></div>
+                </div>
             </section>
 
             <aside class="panel form-panel">
@@ -41,44 +86,139 @@
                 <form id="taskForm" class="task-form">
                     <div class="field-group">
                         <label for="taskTitle">任務標題</label>
-                        <input
-                            type="text"
-                            id="taskTitle"
-                            placeholder="例如：完成專案報告"
-                            required
-                        >
+                        <input type="text" id="taskTitle" placeholder="例如：完成專案報告" required>
                     </div>
                     <div class="field-group">
                         <label for="taskTime">預定時間</label>
-                        <input
-                            type="datetime-local"
-                            id="taskTime"
-                            required
-                        >
+                        <input type="datetime-local" id="taskTime" required>
+                    </div>
+                    <div class="field-group">
+                        <label for="taskPriority">任務優先級</label>
+                        <select id="taskPriority" required>
+                            <option value="normal">一般</option>
+                            <option value="high">高</option>
+                            <option value="low">低</option>
+                        </select>
                     </div>
                     <div class="field-group">
                         <label for="taskNotes">備註 / 任務說明</label>
-                        <textarea
-                            id="taskNotes"
-                            rows="4"
-                            placeholder="例如：上午10點與團隊會議"
-                        ></textarea>
+                        <textarea id="taskNotes" rows="4" placeholder="例如：上午10點與團隊會議"></textarea>
                     </div>
-                    <button type="submit" class="btn btn-primary">
-                        新增任務
-                    </button>
+                    <div class="field-group">
+                        <label for="taskTags">標籤（以逗號分隔）</label>
+                        <input type="text" id="taskTags" placeholder="例如：會議,重要">
+                    </div>
+                    <div class="field-group">
+                        <label for="taskRecurrence">重複</label>
+                        <select id="taskRecurrence">
+                            <option value="none">不重複</option>
+                            <option value="daily">每天</option>
+                            <option value="weekly">每週</option>
+                            <option value="monthly">每月</option>
+                        </select>
+                    </div>
+                    <div id="recurrenceDetails" class="field-group hidden">
+                        <label>進階重複設定</label>
+                        <div class="field-inline">
+                            <label>間隔</label>
+                            <input type="number" id="recurrenceInterval" min="1" value="1">
+                            <span class="muted">（例如：間隔2表示每2天/週/月）</span>
+                        </div>
+                        <div id="weeklyDays" class="field-inline hidden">
+                            <label>每週選擇星期：</label>
+                            <label><input type="checkbox" value="0">日</label>
+                            <label><input type="checkbox" value="1">一</label>
+                            <label><input type="checkbox" value="2">二</label>
+                            <label><input type="checkbox" value="3">三</label>
+                            <label><input type="checkbox" value="4">四</label>
+                            <label><input type="checkbox" value="5">五</label>
+                            <label><input type="checkbox" value="6">六</label>
+                        </div>
+                        <div class="field-inline">
+                            <label for="recurrenceEnd">結束日期（選填）</label>
+                            <input type="date" id="recurrenceEnd">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">新增任務</button>
                 </form>
 
                 <div class="hint-card">
-                    <p>
-                        新增後任務會立即出現在左側任務欄中。
-                        可標記完成或刪除任務。
-                    </p>
+                    <p>新增後任務會立即出現在左側任務欄中。可標記完成、拖曳排序，並切換到日曆視圖檢視任務。</p>
                 </div>
             </aside>
         </main>
     </div>
 
+    <div id="taskDetailModal" class="modal hidden">
+        <div class="modal-panel">
+            <button type="button" class="btn btn-secondary modal-close" id="closeModalBtn">✕</button>
+            <h3 id="detailTitle">任務詳情</h3>
+            <p class="detail-row"><strong>時間：</strong><span id="detailTime"></span></p>
+            <p class="detail-row"><strong>優先級：</strong><span id="detailPriority"></span></p>
+            <p class="detail-row"><strong>描述：</strong></p>
+            <p id="detailNotes"></p>
+            <p class="detail-row"><strong>完成狀態：</strong><span id="detailStatus"></span></p>
+        </div>
+    </div>
+
+    <div id="taskEditModal" class="modal hidden">
+        <div class="modal-panel">
+            <button type="button" class="btn btn-secondary modal-close" id="closeEditModalBtn">✕</button>
+            <h3>編輯任務</h3>
+            <form id="editTaskForm" class="modal-form">
+                <div class="field-group">
+                    <label for="editTaskTitle">任務標題</label>
+                    <input type="text" id="editTaskTitle" required>
+                </div>
+                <div class="field-group">
+                    <label for="editTaskTime">預定時間</label>
+                    <input type="datetime-local" id="editTaskTime" required>
+                </div>
+                <div class="field-group">
+                    <label for="editTaskPriority">任務優先級</label>
+                    <select id="editTaskPriority" required>
+                        <option value="normal">一般</option>
+                        <option value="high">高</option>
+                        <option value="low">低</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label for="editTaskNotes">備註 / 任務說明</label>
+                    <textarea id="editTaskNotes" rows="4"></textarea>
+                </div>
+                <div class="field-group">
+                    <label for="editTaskTags">標籤（以逗號分隔）</label>
+                    <input type="text" id="editTaskTags">
+                </div>
+                <div class="field-group">
+                    <label for="editTaskRecurrence">重複</label>
+                    <select id="editTaskRecurrence">
+                        <option value="none">不重複</option>
+                        <option value="daily">每天</option>
+                        <option value="weekly">每週</option>
+                        <option value="monthly">每月</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">儲存變更</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="importPreviewModal" class="modal hidden">
+        <div class="modal-panel">
+            <button type="button" class="btn btn-secondary modal-close" id="closeImportPreviewBtn">✕</button>
+            <h3>匯入預覽</h3>
+            <p id="importPreviewCount">準備匯入 0 筆任務</p>
+            <div id="importPreviewTable" class="import-preview-table"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="importCancelBtn">取消</button>
+                <button type="button" class="btn btn-primary" id="importMergeBtn">合併到現有任務</button>
+                <button type="button" class="btn btn-danger" id="importReplaceBtn">覆蓋全部任務</button>
+            </div>
+        </div>
+    </div>
+
     <script src="script.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </body>
 </html>
