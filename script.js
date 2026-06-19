@@ -33,15 +33,7 @@ const editPrioritySelect = document.getElementById('editTaskPriority');
 const editNotesInput = document.getElementById('editTaskNotes');
 const editTagsInput = document.getElementById('editTaskTags');
 const editRecurrenceSelect = document.getElementById('editTaskRecurrence');
-const importPreviewModal = document.getElementById('importPreviewModal');
-const closeImportPreviewBtn = document.getElementById('closeImportPreviewBtn');
-const importCancelBtn = document.getElementById('importCancelBtn');
-const importMergeBtn = document.getElementById('importMergeBtn');
-const importReplaceBtn = document.getElementById('importReplaceBtn');
-const importPreviewCount = document.getElementById('importPreviewCount');
-const importPreviewTable = document.getElementById('importPreviewTable');
 let editIndex = null;
-let pendingImportData = null;
 
 const defaultTasks = [
     {
@@ -155,10 +147,25 @@ function setupEventListeners() {
     const importBtn = document.getElementById('importBtn');
     const importFile = document.getElementById('importFile');
     const exportBtn = document.getElementById('exportBtn');
+    const apiUrlInput = document.getElementById('apiUrlInput');
+    const apiImportBtn = document.getElementById('apiImportBtn');
+    const gasEndpointInput = document.getElementById('gasEndpointInput');
+    const backupGASBtn = document.getElementById('backupGASBtn');
 
     importBtn.addEventListener('click', () => importFile.click());
     importFile.addEventListener('change', handleImportFile);
     exportBtn.addEventListener('click', () => exportTasks());
+    apiImportBtn.addEventListener('click', () => {
+        const url = (apiUrlInput && apiUrlInput.value) ? apiUrlInput.value.trim() : '';
+        if (!url) { alert('請輸入 API URL'); return; }
+        importFromApi(url);
+    });
+
+    backupGASBtn.addEventListener('click', () => {
+        const url = (gasEndpointInput && gasEndpointInput.value) ? gasEndpointInput.value.trim() : '';
+        if (!url) { alert('請輸入 GAS Webapp URL'); return; }
+        backupToGAS(url);
+    });
 
     closeModalBtn.addEventListener('click', () => {
         detailModal.classList.add('hidden');
@@ -204,40 +211,6 @@ function setupEventListeners() {
         renderTasks();
         renderCalendar();
         taskEditModal.classList.add('hidden');
-    });
-
-    // import preview modal handlers
-    closeImportPreviewBtn.addEventListener('click', () => {
-        importPreviewModal.classList.add('hidden');
-        pendingImportData = null;
-    });
-
-    importCancelBtn.addEventListener('click', () => {
-        importPreviewModal.classList.add('hidden');
-        pendingImportData = null;
-    });
-
-    importPreviewModal.addEventListener('click', event => {
-        if (event.target === importPreviewModal) {
-            importPreviewModal.classList.add('hidden');
-            pendingImportData = null;
-        }
-    });
-
-    importMergeBtn.addEventListener('click', () => {
-        if (pendingImportData) {
-            mergeImportedTasks(pendingImportData, false);
-            importPreviewModal.classList.add('hidden');
-            pendingImportData = null;
-        }
-    });
-
-    importReplaceBtn.addEventListener('click', () => {
-        if (pendingImportData) {
-            mergeImportedTasks(pendingImportData, true);
-            importPreviewModal.classList.add('hidden');
-            pendingImportData = null;
-        }
     });
 }
 
@@ -526,30 +499,23 @@ function handleImportFile(e) {
     const name = file.name.toLowerCase();
     reader.onload = ev => {
         const content = ev.target.result;
-        let imported = null;
-        try {
-            if (name.endsWith('.json')) {
-                imported = JSON.parse(content);
-            } else if (name.endsWith('.csv')) {
-                imported = parseCSV(content);
-            } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-                if (!window.XLSX) { alert('需要連線載入SheetJS以匯入Excel'); return; }
-                const wb = XLSX.read(content, { type: 'binary' });
-                const wsname = wb.SheetNames[0];
-                const ws = wb.Sheets[wsname];
-                const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
-                imported = json.map(mapImportedRow);
+        if (name.endsWith('.json')) {
+            try {
+                const imported = JSON.parse(content);
+                mergeImportedTasks(imported);
+            } catch (err) {
+                alert('無法解析 JSON');
             }
-            if (imported) {
-                if (!Array.isArray(imported)) {
-                    alert('匯入資料格式錯誤');
-                    return;
-                }
-                const normalized = imported.map(mapImportedRow);
-                showImportPreview(normalized);
-            }
-        } catch (err) {
-            alert('匯入失敗：' + err.message);
+        } else if (name.endsWith('.csv')) {
+            const parsed = parseCSV(content);
+            mergeImportedTasks(parsed);
+        } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+            if (!window.XLSX) { alert('需要連線載入SheetJS以匯入Excel'); return; }
+            const wb = XLSX.read(content, { type: 'binary' });
+            const wsname = wb.SheetNames[0];
+            const ws = wb.Sheets[wsname];
+            const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            mergeImportedTasks(json.map(mapImportedRow));
         }
     };
     if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
@@ -558,27 +524,6 @@ function handleImportFile(e) {
         reader.readAsText(file);
     }
     e.target.value = '';
-}
-
-function showImportPreview(data) {
-    pendingImportData = data;
-    importPreviewCount.textContent = `準備匯入 ${data.length} 筆任務`;
-    
-    // build table
-    importPreviewTable.innerHTML = '<table class="preview-table"><thead><tr><th>標題</th><th>時間</th><th>優先級</th><th>標籤</th></tr></thead><tbody></tbody></table>';
-    const tbody = importPreviewTable.querySelector('tbody');
-    data.forEach(task => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${(task.title || '無標題').substring(0, 30)}</td>
-            <td>${task.time ? new Date(task.time).toLocaleString('zh-TW') : '未設定'}</td>
-            <td>${task.priority === 'high' ? '高' : task.priority === 'low' ? '低' : '中'}</td>
-            <td>${(task.tags || []).join('、') || '無'}</td>
-        `;
-        tbody.appendChild(row);
-    });
-    
-    importPreviewModal.classList.remove('hidden');
 }
 
 function parseCSV(text) {
@@ -604,19 +549,51 @@ function mapImportedRow(row) {
     };
 }
 
-function mergeImportedTasks(list, replace = false) {
+function mergeImportedTasks(list) {
     if (!Array.isArray(list)) { alert('匯入資料格式錯誤'); return; }
     const normalized = list.map(mapImportedRow);
-    if (replace) {
-        tasks = normalized;
-    } else {
-        tasks = normalized.concat(tasks);
-    }
+    tasks = normalized.concat(tasks);
     saveTasks();
     renderTasks();
     renderCalendar();
-    const mode = replace ? '覆蓋' : '合併';
-    alert(`匯入完成（${mode}）：${normalized.length} 筆`);
+    alert('匯入完成：' + normalized.length + ' 筆');
+}
+
+// fetch tasks from remote API (expects JSON array or {tasks: [...]})
+async function importFromApi(url) {
+    try {
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        let list = [];
+        if (Array.isArray(data)) list = data;
+        else if (Array.isArray(data.tasks)) list = data.tasks;
+        else {
+            alert('API 回傳格式不正確，需為 JSON 陣列或 {tasks: [...] }');
+            return;
+        }
+        mergeImportedTasks(list);
+    } catch (err) {
+        console.error('API 匯入失敗', err);
+        alert('API 匯入失敗：' + err.message);
+    }
+}
+
+// POST tasks to a Google Apps Script Webapp endpoint for storage
+async function backupToGAS(url) {
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tasks })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        alert('備份成功: ' + (json.message || '已送出'));
+    } catch (err) {
+        console.error('GAS 備份失敗', err);
+        alert('備份失敗：' + err.message);
+    }
 }
 
 function openEditTask(index) {

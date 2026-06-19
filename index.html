@@ -23,6 +23,10 @@
                     <div class="dropdown-export">
                         <button type="button" class="btn btn-secondary" id="exportBtn">匯出</button>
                     </div>
+                    <input type="text" id="apiUrlInput" placeholder="API URL（例如：https://api.example.com/tasks）" style="width:320px">
+                    <button type="button" class="btn btn-secondary" id="apiImportBtn">從 API 匯入</button>
+                    <input type="text" id="gasEndpointInput" placeholder="GAS Webapp URL（用於備份）" style="width:320px">
+                    <button type="button" class="btn btn-secondary" id="backupGASBtn">備份到 Google Sheets</button>
                 </div>
             </div>
         </header>
@@ -201,20 +205,6 @@
                 </div>
                 <button type="submit" class="btn btn-primary">儲存變更</button>
             </form>
-        </div>
-    </div>
-
-    <div id="importPreviewModal" class="modal hidden">
-        <div class="modal-panel">
-            <button type="button" class="btn btn-secondary modal-close" id="closeImportPreviewBtn">✕</button>
-            <h3>匯入預覽</h3>
-            <p id="importPreviewCount">準備匯入 0 筆任務</p>
-            <div id="importPreviewTable" class="import-preview-table"></div>
-            <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" id="importCancelBtn">取消</button>
-                <button type="button" class="btn btn-primary" id="importMergeBtn">合併到現有任務</button>
-                <button type="button" class="btn btn-danger" id="importReplaceBtn">覆蓋全部任務</button>
-            </div>
         </div>
     </div>
 
