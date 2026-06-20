@@ -13,27 +13,32 @@ const SHEET_NAME = 'Tasks';
 function doPost(e) {
   try {
     const body = e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : null;
-    if (!body || !Array.isArray(body.tasks)) {
-      return ContentService.createTextOutput(JSON.stringify({ error: 'Invalid payload, expected { tasks: [...] }' })).setMimeType(ContentService.MimeType.JSON);
+    if (!body || (!Array.isArray(body.tasks) && !Array.isArray(body))) {
+      return ContentService.createTextOutput(JSON.stringify({ error: 'Invalid payload, expected { tasks: [...] } or [...]' })).setMimeType(ContentService.MimeType.JSON);
     }
+
+    const tasksPayload = Array.isArray(body.tasks) ? body.tasks : body;
     const ss = SpreadsheetApp.openById(SHEET_ID);
     let sheet = ss.getSheetByName(SHEET_NAME);
     if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
-    // header
-    const headers = ['title','time','priority','notes','tags','recurrence','done'];
+    const headers = ['title', 'time', 'priority', 'notes', 'tags', 'recurrence', 'done'];
     if (sheet.getLastRow() === 0) sheet.appendRow(headers);
 
-    const rows = body.tasks.map(t => [
+    const rows = tasksPayload.map(t => [
       t.title || '',
-      t.time || '',
+      t.time || t.datetime || '',
       t.priority || '',
       t.notes || '',
       (t.tags || []).join(','),
       t.recurrence || '',
       t.done ? '1' : '0'
     ]);
-    sheet.getRange(sheet.getLastRow()+1, 1, rows.length, rows[0].length).setValues(rows);
 
+    if (rows.length === 0) {
+      return ContentService.createTextOutput(JSON.stringify({ message: 'No tasks to insert', inserted: 0 })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
     return ContentService.createTextOutput(JSON.stringify({ message: 'OK', inserted: rows.length })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ error: err.message })).setMimeType(ContentService.MimeType.JSON);

@@ -1,840 +1,429 @@
-const STORAGE_KEY = 'questPlannerTasks';
+const STORAGE_KEY = 'schedulePlanner.Tasks';
 const taskForm = document.getElementById('taskForm');
-const taskListEl = document.getElementById('taskList');
-const taskCountEl = document.getElementById('taskCount');
-const taskTotalEl = document.getElementById('taskTotal');
-const taskSearchInput = document.getElementById('taskSearch');
-const taskSortSelect = document.getElementById('taskSort');
-const tagFilterSelect = document.getElementById('tagFilter');
-const recurrenceDetailsEl = document.getElementById('recurrenceDetails');
-const recurrenceIntervalInput = document.getElementById('recurrenceInterval');
-const weeklyDaysEl = document.getElementById('weeklyDays');
-const recurrenceEndInput = document.getElementById('recurrenceEnd');
-const taskListSection = document.getElementById('taskListSection');
-const calendarSection = document.getElementById('calendarSection');
-const currentMonthLabel = document.getElementById('currentMonthLabel');
+const taskList = document.getElementById('taskList');
+const taskCount = document.getElementById('taskCount');
+const taskTotal = document.getElementById('taskTotal');
+const selectedDateInput = document.getElementById('selectedDate');
+const selectedDateLabel = document.getElementById('selectedDateLabel');
+const panelTitle = document.getElementById('panelTitle');
+const taskPriority = document.getElementById('taskPriority');
+const taskTags = document.getElementById('taskTags');
+const taskNotes = document.getElementById('taskNotes');
+const taskTitle = document.getElementById('taskTitle');
+const taskDateTime = document.getElementById('taskDateTime');
+const importSuggestionButton = document.getElementById('importSuggestion');
+const backupToGasButton = document.getElementById('backupToGas');
+const gasUrlInput = document.getElementById('gasUrl');
+const taskListView = document.getElementById('taskListView');
+const calendarView = document.getElementById('calendarView');
 const calendarGrid = document.getElementById('calendarGrid');
-const prevMonthBtn = document.getElementById('prevMonthBtn');
-const nextMonthBtn = document.getElementById('nextMonthBtn');
-const viewButtons = document.querySelectorAll('.view-toggle');
-const detailModal = document.getElementById('taskDetailModal');
-const closeModalBtn = document.getElementById('closeModalBtn');
-const detailTitle = document.getElementById('detailTitle');
-const detailTime = document.getElementById('detailTime');
-const detailPriority = document.getElementById('detailPriority');
-const detailNotes = document.getElementById('detailNotes');
-const detailStatus = document.getElementById('detailStatus');
-const taskEditModal = document.getElementById('taskEditModal');
-const closeEditModalBtn = document.getElementById('closeEditModalBtn');
-const editTaskForm = document.getElementById('editTaskForm');
-const editTitleInput = document.getElementById('editTaskTitle');
-const editTimeInput = document.getElementById('editTaskTime');
-const editPrioritySelect = document.getElementById('editTaskPriority');
-const editNotesInput = document.getElementById('editTaskNotes');
-const editTagsInput = document.getElementById('editTaskTags');
-const editRecurrenceSelect = document.getElementById('editTaskRecurrence');
-let editIndex = null;
-
-const defaultTasks = [
-    {
-        title: '檢查今日任務清單',
-        time: '2026-06-09T09:30',
-        priority: 'normal',
-        notes: '確認是否有重要會議與專案交付時間。',
-        done: false
-    },
-    {
-        title: '準備遊戲任務報告',
-        time: '2026-06-09T14:00',
-        priority: 'high',
-        notes: '整理任務欄 UI、功能說明與進度內容。',
-        done: false
-    }
-];
+const calendarMonthLabel = document.getElementById('calendarMonthLabel');
+const prevMonth = document.getElementById('prevMonth');
+const nextMonth = document.getElementById('nextMonth');
+const viewButtons = document.querySelectorAll('.view-switch .btn');
+const editModal = document.getElementById('editModal');
+const closeEditModal = document.getElementById('closeEditModal');
+const cancelEdit = document.getElementById('cancelEdit');
+const editForm = document.getElementById('editForm');
+const editTitle = document.getElementById('editTitle');
+const editDateTime = document.getElementById('editDateTime');
+const editPriority = document.getElementById('editPriority');
+const editTags = document.getElementById('editTags');
+const editNotes = document.getElementById('editNotes');
 
 let tasks = loadTasks();
+let selectedDate = new Date();
 let currentView = 'list';
-let currentMonth = new Date();
-let draggedIndex = null;
+let calendarMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+let editingTaskId = null;
 
-renderTasks();
-renderCalendar();
-setupEventListeners();
+initialize();
 
-function setupEventListeners() {
-    taskForm.addEventListener('submit', event => {
-        event.preventDefault();
+function initialize() {
+  selectedDateInput.value = formatInputDate(selectedDate);
+  selectedDateLabel.textContent = formatSelectedDate(selectedDate);
+  updateViewVisibility();
+  renderTaskSummary();
+  renderTaskList();
+  renderCalendar();
+  bindEvents();
+}
 
-        const titleInput = document.getElementById('taskTitle');
-        const timeInput = document.getElementById('taskTime');
-        const priorityInput = document.getElementById('taskPriority');
-        const notesInput = document.getElementById('taskNotes');
+function bindEvents() {
+  taskForm.addEventListener('submit', handleAddTask);
+  selectedDateInput.addEventListener('change', handleDateChange);
+  prevMonth.addEventListener('click', () => {
+    calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
+    renderCalendar();
+  });
+  nextMonth.addEventListener('click', () => {
+    calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
+    renderCalendar();
+  });
+  viewButtons.forEach(button => {
+    button.addEventListener('click', () => setView(button.dataset.view));
+  });
+  closeEditModal.addEventListener('click', closeEditDialog);
+  cancelEdit.addEventListener('click', closeEditDialog);
+  editForm.addEventListener('submit', handleEditTask);
+  importSuggestionButton.addEventListener('click', handleImportSuggestion);
+  backupToGasButton.addEventListener('click', handleBackupToGas);
+  editModal.addEventListener('click', event => {
+    if (event.target === editModal) closeEditDialog();
+  });
+}
 
-        const title = titleInput.value.trim();
-        const time = timeInput.value;
-        const priority = priorityInput.value;
-        const notes = notesInput.value.trim();
-        const tags = document.getElementById('taskTags').value.split(',').map(s=>s.trim()).filter(Boolean);
-        const recurrence = document.getElementById('taskRecurrence').value;
-        const recurrenceInterval = Number(recurrenceIntervalInput.value) || 1;
-        const recurrenceEnd = recurrenceEndInput.value || null;
-        const weeklyDays = Array.from(weeklyDaysEl.querySelectorAll('input[type=checkbox]:checked')).map(cb=>Number(cb.value));
+function handleAddTask(event) {
+  event.preventDefault();
+  const title = taskTitle.value.trim();
+  const datetime = taskDateTime.value;
+  const priority = taskPriority.value;
+  const tags = parseTags(taskTags.value);
+  const notes = taskNotes.value.trim();
 
-        if (!title || !time) {
-            return;
-        }
+  if (!title || !datetime) return;
 
-        tasks.unshift({
-            title,
-            time,
-            priority,
-            notes,
-            tags,
-            recurrence,
-            recurrenceDetails: {
-                interval: recurrenceInterval,
-                weekdays: weeklyDays,
-                endDate: recurrenceEnd
-            },
-            done: false
-        });
+  const newTask = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    title,
+    datetime,
+    priority,
+    tags,
+    notes,
+    done: false,
+    createdAt: new Date().toISOString()
+  };
 
-        saveTasks();
-        renderTasks();
-        renderCalendar();
+  tasks.unshift(newTask);
+  saveTasks();
+  taskForm.reset();
+  taskPriority.value = 'normal';
+  selectedDateInput.value = formatInputDate(new Date(datetime));
+  selectedDate = new Date(datetime);
+  calendarMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+  selectedDateLabel.textContent = formatSelectedDate(selectedDate);
+  renderAll();
+}
 
-        taskForm.reset();
-        titleInput.focus();
-    });
-
-    // recurrence details show/hide
-    const recurrenceSelect = document.getElementById('taskRecurrence');
-    recurrenceSelect.addEventListener('change', () => {
-        const v = recurrenceSelect.value;
-        recurrenceDetailsEl.classList.toggle('hidden', v === 'none');
-        weeklyDaysEl.classList.toggle('hidden', v !== 'weekly');
-    });
-
-    // tag filter
-    tagFilterSelect.addEventListener('change', () => renderTasks());
-
-
-    taskSearchInput.addEventListener('input', () => {
-        renderTasks();
-    });
-
-    taskSortSelect.addEventListener('change', () => {
-        renderTasks();
-    });
-
-    prevMonthBtn.addEventListener('click', () => {
-        currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
-        renderCalendar();
-    });
-
-    nextMonthBtn.addEventListener('click', () => {
-        currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
-        renderCalendar();
-    });
-
-    viewButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            setView(button.dataset.view);
-        });
-    });
-
-    // import/export
-    const importBtn = document.getElementById('importBtn');
-    const importFile = document.getElementById('importFile');
-    const exportBtn = document.getElementById('exportBtn');
-    const apiUrlInput = document.getElementById('apiUrlInput');
-    const apiImportBtn = document.getElementById('apiImportBtn');
-    const gasEndpointInput = document.getElementById('gasEndpointInput');
-    const backupGASBtn = document.getElementById('backupGASBtn');
-
-    importBtn.addEventListener('click', () => importFile.click());
-    importFile.addEventListener('change', handleImportFile);
-    exportBtn.addEventListener('click', () => exportTasks());
-    apiImportBtn.addEventListener('click', () => {
-        const url = (apiUrlInput && apiUrlInput.value) ? apiUrlInput.value.trim() : '';
-        if (!url) { alert('請輸入 API URL'); return; }
-        importFromApi(url);
-    });
-
-    backupGASBtn.addEventListener('click', () => {
-        const url = (gasEndpointInput && gasEndpointInput.value) ? gasEndpointInput.value.trim() : '';
-        if (!url) { alert('請輸入 GAS Webapp URL'); return; }
-        backupToGAS(url);
-    });
-
-    closeModalBtn.addEventListener('click', () => {
-        detailModal.classList.add('hidden');
-    });
-
-    detailModal.addEventListener('click', event => {
-        if (event.target === detailModal) {
-            detailModal.classList.add('hidden');
-        }
-    });
-
-    closeEditModalBtn.addEventListener('click', () => {
-        taskEditModal.classList.add('hidden');
-    });
-
-    taskEditModal.addEventListener('click', event => {
-        if (event.target === taskEditModal) {
-            taskEditModal.classList.add('hidden');
-        }
-    });
-
-    editTaskForm.addEventListener('submit', event => {
-        event.preventDefault();
-        if (editIndex === null) return;
-
-        const newTags = editTagsInput.value.split(',').map(s=>s.trim()).filter(Boolean);
-        const newRecurrence = editRecurrenceSelect.value;
-
-        tasks[editIndex] = {
-            ...tasks[editIndex],
-            title: editTitleInput.value.trim(),
-            time: editTimeInput.value,
-            priority: editPrioritySelect.value,
-            notes: editNotesInput.value.trim(),
-            tags: newTags,
-            recurrence: newRecurrence
-        };
-
-        // refresh tag filter options
-        populateTagFilter();
-
-        saveTasks();
-        renderTasks();
-        renderCalendar();
-        taskEditModal.classList.add('hidden');
-    });
+function handleDateChange() {
+  const newDate = new Date(selectedDateInput.value);
+  if (!isValidDate(newDate)) return;
+  selectedDate = newDate;
+  calendarMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+  selectedDateLabel.textContent = formatSelectedDate(selectedDate);
+  renderAll();
 }
 
 function setView(view) {
-    currentView = view;
-    taskListSection.classList.toggle('hidden', view !== 'list');
-    calendarSection.classList.toggle('hidden', view !== 'calendar');
-    viewButtons.forEach(button => button.classList.toggle('active', button.dataset.view === view));
+  currentView = view;
+  viewButtons.forEach(button => {
+    button.classList.toggle('active', button.dataset.view === view);
+  });
+  updateViewVisibility();
 }
 
-function loadTasks() {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-        try {
-            const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed)) {
-                return parsed.map(task => ({
-                    ...task,
-                    priority: task.priority || 'normal',
-                    done: typeof task.done === 'boolean' ? task.done : false
-                }));
-            }
-        } catch (error) {
-            console.warn('無法解析本機儲存任務，將使用預設任務。', error);
-        }
-    }
-    return [...defaultTasks];
+function updateViewVisibility() {
+  taskListView.classList.toggle('hidden', currentView !== 'list');
+  calendarView.classList.toggle('hidden', currentView !== 'calendar');
+  panelTitle.textContent = currentView === 'calendar' ? '日曆檢視' : '清單檢視';
 }
 
-function saveTasks() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+function getTasksForDate(date) {
+  const key = formatKeyDate(date);
+  return tasks
+    .filter(task => formatKeyDate(new Date(task.datetime)) === key)
+    .sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
 }
 
-function populateTagFilter() {
-    const sel = tagFilterSelect;
-    const prev = sel.value;
-    const allTags = new Set();
-    tasks.forEach(t => (t.tags || []).forEach(tag => allTags.add(tag)));
-    sel.innerHTML = '<option value="">全部標籤</option>';
-    Array.from(allTags).sort().forEach(tag => {
-        const opt = document.createElement('option');
-        opt.value = tag;
-        opt.textContent = tag;
-        sel.appendChild(opt);
-    });
-    if (prev) sel.value = prev;
-}
+function renderTaskList() {
+  const dayTasks = getTasksForDate(selectedDate);
+  taskList.innerHTML = '';
 
-function getVisibleTasks() {
-    const keyword = taskSearchInput.value.trim().toLowerCase();
-    const tagFilter = tagFilterSelect.value;
-    const filtered = tasks
-        .map((task, index) => ({ task, index }))
-        .filter(({ task }) => {
-            if (!keyword) return true;
-            return [task.title, task.notes, task.time, task.priority]
-                .join(' ')
-                .toLowerCase()
-                .includes(keyword);
-        });
-    let result = filtered;
-    if (tagFilter) {
-        result = result.filter(({ task }) => (task.tags || []).includes(tagFilter));
-    }
-    const sortMode = taskSortSelect.value;
-    if (sortMode === 'manual') {
-        return result;
-    }
+  if (!dayTasks.length) {
+    const emptyItem = document.createElement('li');
+    emptyItem.className = 'task-card';
+    emptyItem.innerHTML = '<p class="task-notes">目前此日期沒有任務。請新增一筆或切換日期查看。</p>';
+    taskList.appendChild(emptyItem);
+    return;
+  }
 
-    return result.sort((a, b) => {
-        if (sortMode === 'time') {
-            return new Date(a.task.time) - new Date(b.task.time);
-        }
-        if (sortMode === 'priority') {
-            const priorityOrder = { high: 0, normal: 1, low: 2 };
-            return priorityOrder[a.task.priority] - priorityOrder[b.task.priority];
-        }
-        if (sortMode === 'done') {
-            return Number(a.task.done) - Number(b.task.done);
-        }
-        return a.index - b.index;
-    });
-}
+  dayTasks.forEach(task => {
+    const item = document.createElement('li');
+    item.className = `task-card ${task.done ? 'completed' : ''}`;
+    item.innerHTML = `
+      <div>
+        <div class="task-meta">
+          <h3>${escapeHtml(task.title)}</h3>
+          <span class="badge badge-${task.priority}">${formatPriority(task.priority)}</span>
+        </div>
+        <div class="task-meta">
+          <div class="task-time">${formatDisplayDate(task.datetime)}</div>
+          ${task.tags.length ? `<div class="tag-list">${task.tags.map(tag => `<span class="tag-item">${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
+        </div>
+        <p class="task-notes">${escapeHtml(task.notes || '無備註')}</p>
+      </div>
+      <div class="task-actions">
+        <button class="btn btn-secondary" data-action="toggle" data-id="${task.id}">${task.done ? '取消完成' : '完成'}</button>
+        <button class="btn btn-secondary" data-action="edit" data-id="${task.id}">編輯</button>
+        <button class="btn btn-danger" data-action="delete" data-id="${task.id}">刪除</button>
+      </div>
+    `;
 
-function renderTasks() {
-    populateTagFilter();
-    const visibleTasks = getVisibleTasks();
-    taskListEl.innerHTML = '';
-    taskCountEl.textContent = visibleTasks.length;
-    taskTotalEl.textContent = tasks.length;
-
-    if (visibleTasks.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'task-card';
-        empty.innerHTML = '<p class="task-notes">目前沒有符合條件的任務。請調整搜尋或排序條件。</p>';
-        taskListEl.appendChild(empty);
-        return;
-    }
-
-    visibleTasks.forEach(({ task, index }) => {
-        const card = createTaskCard(task, index);
-        taskListEl.appendChild(card);
-    });
-}
-
-function createTaskCard(task, index) {
-    const card = document.createElement('article');
-    card.className = 'task-card';
-    card.draggable = taskSortSelect.value === 'manual';
-    card.dataset.index = index;
-
-    if (card.draggable) {
-        card.addEventListener('dragstart', handleDragStart);
-        card.addEventListener('dragend', handleDragEnd);
-        card.addEventListener('dragover', handleDragOver);
-        card.addEventListener('dragleave', handleDragLeave);
-        card.addEventListener('drop', handleDrop);
-    }
-
-    const meta = document.createElement('div');
-    meta.className = 'task-meta';
-
-    const header = document.createElement('div');
-    header.className = 'task-header';
-
-    const title = document.createElement('h3');
-    title.className = 'task-title';
-    title.textContent = task.title;
-    if (task.done) {
-        title.style.textDecoration = 'line-through';
-        title.style.opacity = '0.7';
-    }
-
-    const priority = document.createElement('span');
-    priority.className = `priority-badge priority-${task.priority}`;
-    priority.textContent = task.priority === 'high' ? '高' : task.priority === 'low' ? '低' : '中';
-
-    header.appendChild(title);
-    header.appendChild(priority);
-
-    // tags badges
-    if (task.tags && task.tags.length) {
-        const tagContainer = document.createElement('div');
-        tagContainer.className = 'task-tags';
-        task.tags.forEach(tag => {
-            const t = document.createElement('span');
-            t.className = 'tag-badge';
-            t.textContent = tag;
-            t.style.background = tagColor(tag);
-            tagContainer.appendChild(t);
-        });
-        header.appendChild(tagContainer);
-    }
-
-    const time = document.createElement('div');
-    time.className = 'task-time';
-    time.textContent = formatTaskTime(task.time);
-
-    const notes = document.createElement('p');
-    notes.className = 'task-notes';
-    notes.textContent = task.notes || '無額外說明。';
-
-    meta.appendChild(header);
-    meta.appendChild(time);
-    meta.appendChild(notes);
-
-    const actions = document.createElement('div');
-    actions.className = 'task-actions';
-
-    const doneButton = document.createElement('button');
-    doneButton.type = 'button';
-    doneButton.className = task.done ? 'btn btn-success' : 'btn btn-secondary';
-    doneButton.textContent = task.done ? '已完成' : '標記完成';
-    doneButton.addEventListener('click', () => {
-        tasks[index].done = !tasks[index].done;
-        saveTasks();
-        renderTasks();
-        renderCalendar();
+    item.querySelectorAll('button').forEach(button => {
+      button.addEventListener('click', handleTaskAction);
     });
 
-    const deleteButton = document.createElement('button');
-    deleteButton.type = 'button';
-    deleteButton.className = 'btn btn-danger';
-    deleteButton.textContent = '刪除';
-    deleteButton.addEventListener('click', () => {
-        tasks.splice(index, 1);
-        saveTasks();
-        renderTasks();
-        renderCalendar();
-    });
-
-    actions.appendChild(doneButton);
-
-    const editButton = document.createElement('button');
-    editButton.type = 'button';
-    editButton.className = 'btn btn-secondary';
-    editButton.textContent = '編輯';
-    editButton.addEventListener('click', () => openEditTask(index));
-
-    actions.appendChild(editButton);
-    actions.appendChild(deleteButton);
-    card.appendChild(meta);
-    card.appendChild(actions);
-    return card;
-}
-
-function tagColor(tag) {
-    const colors = ['#e57373','#f06292','#ba68c8','#9575cd','#64b5f6','#4db6ac','#81c784','#fff176','#ffb74d','#a1887f'];
-    let hash = 0;
-    for (let i = 0; i < tag.length; i++) hash = (hash << 5) - hash + tag.charCodeAt(i);
-    const idx = Math.abs(hash) % colors.length;
-    return colors[idx];
-}
-
-// Import / Export helpers
-function exportTasks() {
-    // offer JSON and CSV and XLSX if available
-    const data = tasks;
-    const jsonStr = JSON.stringify(data, null, 2);
-    // download JSON
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'tasks.json';
-    a.click();
-    URL.revokeObjectURL(url);
-
-    // also create CSV
-    const csv = tasksToCSV(tasks);
-    const blobCsv = new Blob([csv], { type: 'text/csv' });
-    const url2 = URL.createObjectURL(blobCsv);
-    const b = document.createElement('a');
-    b.href = url2;
-    b.download = 'tasks.csv';
-    b.click();
-    URL.revokeObjectURL(url2);
-
-    // try XLSX via SheetJS
-    if (window.XLSX) {
-        const ws = XLSX.utils.json_to_sheet(data.map(t => ({
-            title: t.title,
-            time: t.time,
-            priority: t.priority,
-            notes: t.notes,
-            tags: (t.tags || []).join(','),
-            recurrence: t.recurrence || 'none',
-            done: t.done
-        })));
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Tasks');
-        XLSX.writeFile(wb, 'tasks.xlsx');
-    }
-}
-
-function tasksToCSV(arr) {
-    const headers = ['title','time','priority','notes','tags','recurrence','done'];
-    const rows = [headers.join(',')];
-    arr.forEach(t => {
-        const row = [
-            escapeCsv(t.title),
-            t.time,
-            t.priority,
-            escapeCsv(t.notes || ''),
-            (t.tags||[]).join('|'),
-            t.recurrence || 'none',
-            t.done ? '1' : '0'
-        ];
-        rows.push(row.join(','));
-    });
-    return rows.join('\n');
-}
-
-function escapeCsv(str) {
-    if (str == null) return '';
-    if (str.includes(',') || str.includes('\n') || str.includes('"')) {
-        return '"' + str.replace(/"/g, '""') + '"';
-    }
-    return str;
-}
-
-function handleImportFile(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    const name = file.name.toLowerCase();
-    reader.onload = ev => {
-        const content = ev.target.result;
-        if (name.endsWith('.json')) {
-            try {
-                const imported = JSON.parse(content);
-                mergeImportedTasks(imported);
-            } catch (err) {
-                alert('無法解析 JSON');
-            }
-        } else if (name.endsWith('.csv')) {
-            const parsed = parseCSV(content);
-            mergeImportedTasks(parsed);
-        } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-            if (!window.XLSX) { alert('需要連線載入SheetJS以匯入Excel'); return; }
-            const wb = XLSX.read(content, { type: 'binary' });
-            const wsname = wb.SheetNames[0];
-            const ws = wb.Sheets[wsname];
-            const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
-            mergeImportedTasks(json.map(mapImportedRow));
-        }
-    };
-    if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-        reader.readAsBinaryString(file);
-    } else {
-        reader.readAsText(file);
-    }
-    e.target.value = '';
-}
-
-function parseCSV(text) {
-    const lines = text.split(/\r?\n/).filter(Boolean);
-    const headers = lines.shift().split(',').map(h => h.trim());
-    return lines.map(line => {
-        const parts = line.split(',');
-        const obj = {};
-        headers.forEach((h, i) => obj[h] = parts[i] || '');
-        return mapImportedRow(obj);
-    });
-}
-
-function mapImportedRow(row) {
-    return {
-        title: row.title || row.Title || row.TITLE || '',
-        time: row.time || row.Time || '',
-        priority: (row.priority || 'normal').toLowerCase(),
-        notes: row.notes || row.Notes || '',
-        tags: (row.tags || row.Tags || '').toString().split(/[,|]/).map(s=>s.trim()).filter(Boolean),
-        recurrence: row.recurrence || row.Recurrence || 'none',
-        done: row.done === '1' || row.done === true || row.Done === true
-    };
-}
-
-function mergeImportedTasks(list) {
-    if (!Array.isArray(list)) { alert('匯入資料格式錯誤'); return; }
-    const normalized = list.map(mapImportedRow);
-    tasks = normalized.concat(tasks);
-    saveTasks();
-    renderTasks();
-    renderCalendar();
-    alert('匯入完成：' + normalized.length + ' 筆');
-}
-
-// fetch tasks from remote API (expects JSON array or {tasks: [...]})
-async function importFromApi(url) {
-    try {
-        const res = await fetch(url, { cache: 'no-store' });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        let list = [];
-        if (Array.isArray(data)) list = data;
-        else if (Array.isArray(data.tasks)) list = data.tasks;
-        else {
-            alert('API 回傳格式不正確，需為 JSON 陣列或 {tasks: [...] }');
-            return;
-        }
-        mergeImportedTasks(list);
-    } catch (err) {
-        console.error('API 匯入失敗', err);
-        alert('API 匯入失敗：' + err.message);
-    }
-}
-
-// POST tasks to a Google Apps Script Webapp endpoint for storage
-async function backupToGAS(url) {
-    try {
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tasks })
-        });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const json = await res.json();
-        alert('備份成功: ' + (json.message || '已送出'));
-    } catch (err) {
-        console.error('GAS 備份失敗', err);
-        alert('備份失敗：' + err.message);
-    }
-}
-
-function openEditTask(index) {
-    const task = tasks[index];
-    editIndex = index;
-    editTitleInput.value = task.title;
-    editTimeInput.value = task.time;
-    editPrioritySelect.value = task.priority || 'normal';
-    editNotesInput.value = task.notes || '';
-    taskEditModal.classList.remove('hidden');
-}
-
-function handleDragStart(event) {
-    draggedIndex = Number(event.currentTarget.dataset.index);
-    event.currentTarget.classList.add('dragging');
-}
-
-function handleDragEnd(event) {
-    event.currentTarget.classList.remove('dragging');
-    document.querySelectorAll('.task-card').forEach(card => card.classList.remove('drag-over'));
-}
-
-function handleDragOver(event) {
-    event.preventDefault();
-    const target = event.currentTarget;
-    const targetIndex = Number(target.dataset.index);
-    if (draggedIndex === null || draggedIndex === targetIndex) {
-        return;
-    }
-    target.classList.add('drag-over');
-}
-
-function handleDragLeave(event) {
-    event.currentTarget.classList.remove('drag-over');
-}
-
-function handleDrop(event) {
-    event.preventDefault();
-    const targetIndex = Number(event.currentTarget.dataset.index);
-    if (draggedIndex === null || draggedIndex === targetIndex) {
-        return;
-    }
-
-    const [movedTask] = tasks.splice(draggedIndex, 1);
-    tasks.splice(targetIndex, 0, movedTask);
-    saveTasks();
-    renderTasks();
-    renderCalendar();
+    taskList.appendChild(item);
+  });
 }
 
 function renderCalendar() {
-    calendarGrid.innerHTML = '';
-    // set title depending on view
-    if (currentView === 'week') {
-        // show week that contains currentMonth (or today)
-        const startOfWeek = startOfWeekDate(currentMonth);
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        currentMonthLabel.textContent = `${startOfWeek.toLocaleDateString('zh-TW')} — ${endOfWeek.toLocaleDateString('zh-TW')}`;
-        // prepare range
-        const rangeDates = [];
-        for (let i = 0; i < 7; i++) {
-            const d = new Date(startOfWeek);
-            d.setDate(startOfWeek.getDate() + i);
-            rangeDates.push(d);
-        }
-        const taskGroups = groupTasksInRange(rangeDates[0], rangeDates[rangeDates.length-1]);
-        rangeDates.forEach(date => {
-            const dateKey = formatDateKey(date);
-            const cell = document.createElement('div');
-            cell.className = 'calendar-cell';
-            const dayNumber = document.createElement('div');
-            dayNumber.className = 'calendar-cell-day';
-            dayNumber.textContent = date.getDate();
-            cell.appendChild(dayNumber);
-            const tasksForDate = taskGroups[dateKey] || [];
-            tasksForDate.slice(0, 6).forEach(task => {
-                const taskItem = document.createElement('div');
-                taskItem.className = 'calendar-task';
-                taskItem.dataset.priority = task.priority;
-                taskItem.textContent = `${task.title} (${task.priority === 'high' ? '高' : task.priority === 'low' ? '低' : '中'})`;
-                taskItem.addEventListener('click', () => openTaskDetail(task));
-                cell.appendChild(taskItem);
-            });
-            if (tasksForDate.length > 6) {
-                const more = document.createElement('div');
-                more.className = 'calendar-task';
-                more.textContent = `還有 ${tasksForDate.length - 6} 個任務`;
-                cell.appendChild(more);
-            }
-            calendarGrid.appendChild(cell);
-        });
-    } else {
-        currentMonthLabel.textContent = currentMonth.toLocaleString('zh-TW', { year: 'numeric', month: 'long' });
-        const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-        const startDay = new Date(firstDay);
-        startDay.setDate(firstDay.getDate() - firstDay.getDay());
-        const lastDay = new Date(startDay);
-        lastDay.setDate(startDay.getDate() + 41);
-        const taskGroups = groupTasksInRange(startDay, lastDay);
-        for (let i = 0; i < 42; i++) {
-            const date = new Date(startDay);
-            date.setDate(startDay.getDate() + i);
-            const dateKey = formatDateKey(date);
-            const cell = document.createElement('div');
-            cell.className = 'calendar-cell';
-            if (date.getMonth() !== currentMonth.getMonth()) {
-                cell.classList.add('calendar-cell--muted');
-            }
-            const dayNumber = document.createElement('div');
-            dayNumber.className = 'calendar-cell-day';
-            dayNumber.textContent = date.getDate();
-            cell.appendChild(dayNumber);
-            const tasksForDate = taskGroups[dateKey] || [];
-            tasksForDate.slice(0, 3).forEach(task => {
-                const taskItem = document.createElement('div');
-                taskItem.className = 'calendar-task';
-                taskItem.dataset.priority = task.priority;
-                taskItem.textContent = `${task.title} (${task.priority === 'high' ? '高' : task.priority === 'low' ? '低' : '中'})`;
-                taskItem.addEventListener('click', () => openTaskDetail(task));
-                cell.appendChild(taskItem);
-            });
-            if (tasksForDate.length > 3) {
-                const more = document.createElement('div');
-                more.className = 'calendar-task';
-                more.textContent = `還有 ${tasksForDate.length - 3} 個任務`;
-                cell.appendChild(more);
-            }
-            calendarGrid.appendChild(cell);
-        }
+  calendarMonthLabel.textContent = calendarMonth.toLocaleString('zh-TW', { year: 'numeric', month: 'long' });
+  calendarGrid.innerHTML = '';
+
+  const start = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+  const startDay = start.getDay();
+  const gridStart = new Date(start);
+  gridStart.setDate(start.getDate() - startDay);
+
+  for (let cellIndex = 0; cellIndex < 42; cellIndex += 1) {
+    const cellDate = new Date(gridStart);
+    cellDate.setDate(gridStart.getDate() + cellIndex);
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = 'calendar-cell';
+    if (cellDate.getMonth() !== calendarMonth.getMonth()) cell.classList.add('other-month');
+    if (formatKeyDate(cellDate) === formatKeyDate(selectedDate)) cell.classList.add('selected');
+
+    const dayLabel = document.createElement('div');
+    dayLabel.className = 'calendar-cell-header';
+    dayLabel.innerHTML = `<span>${cellDate.getDate()}</span>${cellDate.toDateString().slice(0,3)}`;
+    cell.appendChild(dayLabel);
+
+    const tasksForDate = getTasksForDate(cellDate);
+    if (tasksForDate.length) {
+      const badge = document.createElement('div');
+      badge.className = 'calendar-task-count';
+      badge.textContent = `${tasksForDate.length} 筆任務`;
+      cell.appendChild(badge);
     }
-}
 
-function groupTasksInRange(startDate, endDate) {
-    // returns map of dateKey -> tasks (including expanded recurring tasks within range)
-    const map = {};
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    tasks.forEach(task => {
-        // base occurrence
-        const tDate = new Date(task.time);
-        if (!isNaN(tDate.getTime()) && tDate >= start && tDate <= end) {
-            const key = formatDateKey(tDate);
-            if (!map[key]) map[key] = [];
-            map[key].push(task);
-        }
-        // recurring with details support
-        if (task.recurrence && task.recurrence !== 'none') {
-            const rd = task.recurrenceDetails || {};
-            let occ = new Date(task.time);
-            const hours = occ.getHours();
-            const minutes = occ.getMinutes();
-            const interval = rd.interval && rd.interval > 0 ? rd.interval : 1;
-            const endLimit = rd.endDate ? new Date(rd.endDate) : null;
-            const effectiveEnd = endLimit && endLimit < end ? endLimit : end;
-
-            if (task.recurrence === 'daily') {
-                const cur = new Date(start);
-                cur.setHours(hours, minutes, 0, 0);
-                // align to first occurrence >= original start
-                while (cur < occ) cur.setDate(cur.getDate() + 1);
-                while (cur <= effectiveEnd) {
-                    const key = formatDateKey(cur);
-                    if (!map[key]) map[key] = [];
-                    map[key].push({ ...task, time: new Date(cur).toISOString() });
-                    cur.setDate(cur.getDate() + interval);
-                }
-            } else if (task.recurrence === 'weekly') {
-                const weekdays = Array.isArray(rd.weekdays) && rd.weekdays.length ? rd.weekdays : [occ.getDay()];
-                // for each weekday, walk from start to end adding by interval weeks
-                weekdays.forEach(wd => {
-                    const cur = new Date(start);
-                    cur.setHours(hours, minutes, 0, 0);
-                    // move to first matching weekday
-                    while (cur.getDay() !== wd) cur.setDate(cur.getDate() + 1);
-                    while (cur < occ) cur.setDate(cur.getDate() + 7 * interval);
-                    while (cur <= effectiveEnd) {
-                        const key = formatDateKey(cur);
-                        if (!map[key]) map[key] = [];
-                        map[key].push({ ...task, time: new Date(cur).toISOString() });
-                        cur.setDate(cur.getDate() + 7 * interval);
-                    }
-                });
-            } else if (task.recurrence === 'monthly') {
-                const dayOfMonth = occ.getDate();
-                const cur = new Date(start.getFullYear(), start.getMonth(), dayOfMonth, hours, minutes, 0, 0);
-                if (cur < occ) cur.setMonth(cur.getMonth() + interval);
-                while (cur <= effectiveEnd) {
-                    const key = formatDateKey(cur);
-                    if (!map[key]) map[key] = [];
-                    map[key].push({ ...task, time: new Date(cur).toISOString() });
-                    cur.setMonth(cur.getMonth() + interval);
-                }
-            }
-        }
+    cell.addEventListener('click', () => {
+      selectedDate = new Date(cellDate);
+      selectedDateInput.value = formatInputDate(selectedDate);
+      selectedDateLabel.textContent = formatSelectedDate(selectedDate);
+      renderAll();
+      setView('list');
     });
-    return map;
+
+    calendarGrid.appendChild(cell);
+  }
 }
 
-function startOfWeekDate(ref) {
-    const d = new Date(ref);
-    // set to current date if ref is month start used earlier; prefer today
-    const today = new Date();
-    // use ref if it's a date representing desired week, otherwise use today
-    const base = ref instanceof Date ? ref : today;
-    const res = new Date(base);
-    const day = res.getDay();
-    res.setDate(res.getDate() - day);
-    res.setHours(0,0,0,0);
-    return res;
+function handleTaskAction(event) {
+  const action = event.currentTarget.dataset.action;
+  const id = event.currentTarget.dataset.id;
+  const targetTask = tasks.find(task => task.id === id);
+  if (!targetTask) return;
+
+  if (action === 'toggle') {
+    targetTask.done = !targetTask.done;
+    saveTasks();
+    renderAll();
+  }
+  if (action === 'edit') {
+    openEditDialog(targetTask);
+  }
+  if (action === 'delete') {
+    tasks = tasks.filter(task => task.id !== id);
+    saveTasks();
+    renderAll();
+  }
 }
 
-function openTaskDetail(task) {
-    detailTitle.textContent = task.title;
-    detailTime.textContent = formatTaskTime(task.time);
-    detailPriority.textContent = task.priority === 'high' ? '高' : task.priority === 'low' ? '低' : '中';
-    detailNotes.textContent = task.notes || '無額外說明。';
-    detailStatus.textContent = task.done ? '已完成' : '等待中';
-    detailModal.classList.remove('hidden');
+function openEditDialog(task) {
+  editingTaskId = task.id;
+  editTitle.value = task.title;
+  editDateTime.value = task.datetime;
+  editPriority.value = task.priority;
+  editTags.value = task.tags.join(', ');
+  editNotes.value = task.notes;
+  editModal.classList.remove('hidden');
 }
 
-function formatTaskTime(value) {
-    if (!value) {
-        return '尚未設定時間';
-    }
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return value;
-    }
-    return date.toLocaleString('zh-TW', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
+function closeEditDialog() {
+  editingTaskId = null;
+  editModal.classList.add('hidden');
+}
+
+function handleEditTask(event) {
+  event.preventDefault();
+  if (!editingTaskId) return;
+
+  const task = tasks.find(item => item.id === editingTaskId);
+  if (!task) return;
+
+  task.title = editTitle.value.trim();
+  task.datetime = editDateTime.value;
+  task.priority = editPriority.value;
+  task.tags = parseTags(editTags.value);
+  task.notes = editNotes.value.trim();
+
+  saveTasks();
+  closeEditDialog();
+  selectedDateInput.value = formatInputDate(new Date(task.datetime));
+  selectedDate = new Date(task.datetime);
+  selectedDateLabel.textContent = formatSelectedDate(selectedDate);
+  renderAll();
+}
+
+function renderAll() {
+  renderTaskSummary();
+  renderTaskList();
+  renderCalendar();
+}
+
+async function handleImportSuggestion() {
+  importSuggestionButton.disabled = true;
+  importSuggestionButton.textContent = '正在匯入...';
+  try {
+    const response = await fetch('https://jsonplaceholder.typicode.com/posts?_limit=1');
+    if (!response.ok) throw new Error('無法取得建議資料');
+    const data = await response.json();
+    const item = data[0];
+    const now = new Date();
+    const datetime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0).toISOString().slice(0, 16);
+    const suggestionTask = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      title: item.title || '今日建議行程',
+      datetime,
+      priority: 'normal',
+      tags: ['建議'],
+      notes: item.body || '自動匯入的行程建議',
+      done: false,
+      createdAt: new Date().toISOString()
+    };
+    tasks.unshift(suggestionTask);
+    saveTasks();
+    selectedDateInput.value = formatInputDate(new Date(datetime));
+    selectedDate = new Date(datetime);
+    calendarMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    selectedDateLabel.textContent = formatSelectedDate(selectedDate);
+    renderAll();
+  } catch (err) {
+    console.error(err);
+    alert('匯入建議行程失敗，請稍後再試。');
+  } finally {
+    importSuggestionButton.disabled = false;
+    importSuggestionButton.textContent = '自動填入建議行程';
+  }
+}
+
+async function handleBackupToGas() {
+  const url = gasUrlInput.value.trim();
+  if (!url) {
+    alert('請先輸入 GAS Web App URL。');
+    return;
+  }
+  backupToGasButton.disabled = true;
+  backupToGasButton.textContent = '備份中...';
+
+  try {
+    const payload = { tasks };
+    const response = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
     });
+
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'GAS 備份失敗');
+
+    alert(`已成功備份 ${result.inserted || 0} 筆任務到 Google Sheets。`);
+  } catch (err) {
+    console.error(err);
+    alert(`備份失敗：${err.message}`);
+  } finally {
+    backupToGasButton.disabled = false;
+    backupToGasButton.textContent = '備份到 Google Sheets';
+  }
 }
 
-function formatDateKey(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+function renderTaskSummary() {
+  taskTotal.textContent = tasks.length;
+  taskCount.textContent = getTasksForDate(selectedDate).length;
+}
+
+function formatKeyDate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatInputDate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatSelectedDate(date) {
+  return `${date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })}`;
+}
+
+function formatDisplayDate(value) {
+  const date = new Date(value);
+  if (!isValidDate(date)) return value;
+  return date.toLocaleString('zh-TW', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function formatPriority(priority) {
+  if (priority === 'high') return '高';
+  if (priority === 'low') return '低';
+  return '中';
+}
+
+function parseTags(value) {
+  return value
+    .split(/[,，]/)
+    .map(tag => tag.trim())
+    .filter(Boolean);
+}
+
+function loadTasks() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(task => ({
+      ...task,
+      tags: Array.isArray(task.tags) ? task.tags : parseTags(task.tags || ''),
+      done: Boolean(task.done)
+    }));
+  } catch (error) {
+    console.warn('無法讀取本機資料', error);
+    return [];
+  }
+}
+
+function saveTasks() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+}
+
+function isValidDate(date) {
+  return date instanceof Date && !Number.isNaN(date.getTime());
+}
+
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
